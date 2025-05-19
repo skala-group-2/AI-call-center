@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - dockervenv:/app/.venv
+      - .:/app # 로컬 프로젝트 디렉토리를 컨테이너 '/app'로 마운트
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+volumes:
+  dockervenv:
