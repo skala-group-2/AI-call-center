@@ -20,7 +20,7 @@ ai_mode = True
 dialog = []
 
 @router.post("/")
-async def call_senter(audio: UploadFile = File(...)):
+async def call_center(audio: UploadFile = File(...)):
     try:
         logger.info("STT → GPT → TTS 요청 시작")
         # 1. 업로드된 파일 저장

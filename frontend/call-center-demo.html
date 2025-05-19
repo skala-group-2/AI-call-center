@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>STT → GPT → TTS 데모</title>
+</head>
+<body>
+  <h1>🎙️ STT → GPT → TTS 데모</h1>
+  <button id="recordBtn">Start Recording</button>
+  <p id="sttText">STT 변환된 텍스트가 여기에 표시됩니다.</p>
+  <p id="gptResponse" style="display: none;">GPT 응답이 여기에 표시됩니다.</p>
+  <p id="filteredText" style="display: none;">필터링된 질문이 여기에 표시됩니다.</p>
+  <p id="summaryText" style="display: none;">요약 내용이 여기에 표시됩니다.</p>
+  <audio id="ttsAudio" controls style="display: none;"></audio>
+
+  <script>
+    let isRecording = false;
+    let mediaRecorder;
+    let audioChunks = [];
+
+    const btn = document.getElementById('recordBtn');
+    const sttTextEl = document.getElementById('sttText');
+    const gptResponseEl = document.getElementById('gptResponse');
+    const filteredTextEl = document.getElementById('filteredText');
+    const summaryTextEl = document.getElementById('summaryText');
+    const ttsAudioEl = document.getElementById('ttsAudio');
+
+    btn.addEventListener('click', async () => {
+      if (!isRecording) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+        mediaRecorder.onstop = async () => {
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          const formData = new FormData();
+          formData.append('audio', blob, 'recording.webm');
+
+          try {
+            const res = await fetch('/call-center/', {
+              method: 'POST',
+              body: formData
+            });
+
+            const data = await res.json();
+
+            // 공통 출력
+            sttTextEl.textContent = `STT 텍스트: ${data.stt_text || '없음'}`;
+
+            // AI 모드
+            if (data.gpt_response) {
+              gptResponseEl.textContent = `GPT 응답: ${data.gpt_response}`;
+              gptResponseEl.style.display = 'block';
+
+              if (data.tts_file_path) {
+                ttsAudioEl.src = data.tts_file_path;
+                ttsAudioEl.style.display = 'block';
+                ttsAudioEl.play();
+              } else {
+                ttsAudioEl.style.display = 'none';
+              }
+
+              filteredTextEl.style.display = 'none';
+              summaryTextEl.style.display = 'none';
+            }
+            // Human 모드
+            else {
+              gptResponseEl.style.display = 'none';
+              ttsAudioEl.style.display = 'none';
+
+              if (data.filtered_question) {
+                filteredTextEl.textContent = `필터링된 질문: ${data.filtered_question}`;
+                filteredTextEl.style.display = 'block';
+              } else {
+                filteredTextEl.style.display = 'none';
+              }
+
+              if (data.summary) {
+                summaryTextEl.textContent = `요약: ${data.summary}`;
+                summaryTextEl.style.display = 'block';
+              } else {
+                summaryTextEl.style.display = 'none';
+              }
+            }
+
+          } catch (err) {
+            alert("오류 발생: " + err);
+          }
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        btn.textContent = 'Stop Recording';
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        btn.textContent = 'Start Recording';
+      }
+    });
+  </script>
+</body>
+</html>

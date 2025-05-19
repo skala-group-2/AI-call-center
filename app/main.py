@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from app.routers.stt_router import router as stt_router # stt_router와 tts_router 임포트
 from app.routers.tts_router import router as tts_router  # tts_router 임포트
 from app.routers.stt_tts_router import router as stt_tts_router
+from app.routers.call_center_router import router as call_center_router
 import openai
 
 from fastapi.responses import JSONResponse
@@ -39,6 +40,9 @@ app.include_router(tts_router, prefix="/tts")
 
 # STT → GPT → TTS 라우터 등록
 app.include_router(stt_tts_router, prefix="/stt-tts")
+
+# call center router
+app.include_router(call_center_router, prefix="/call-center")
 
 # 정적 파일 (HTML 프론트엔드)
 frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend')
