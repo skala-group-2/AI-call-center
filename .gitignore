@@ -138,6 +138,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+vcai
 
 # Spyder project settings
 .spyderproject
