@@ -1,11 +1,57 @@
-'''
-파일명: /service/filtering_service.py(가칭)
-설명: 고객의 파일
-- 함수명: filtering(가칭)
-    - input: 고객 질문(오디오 파일 path) or 고객 질문(str) 중 택 1
-    - output: 필터링 된 응답 내용(str)
-'''
+import os
+import openai
+from dotenv import load_dotenv
 
-def filtering(user_input):
-    filtered_reply = "필터링 된 질문 내용입니다"
-    return filtered_reply
+# 1) .env에서 OPENAI_API_KEY 불러오기
+load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY")
+if not openai.api_key:
+    raise RuntimeError("환경 변수에 OPENAI_API_KEY를 설정해 주세요.")
+
+def filtering(raw_text: str) -> str:
+    """
+    1) 과도한 욕설·모욕·비속어를 판단해 [차단된 발언] 처리
+    2) 상담사 전달용 문의 요지&감정 상태를 정리
+    출력은 :
+      [상담사 전달용 필터&요약문]
+      - 문의 요지: ...
+      - 감정 상태: ...
+    """
+    
+    system_prompt = (
+        "너는 고객과 상담사 사이의 중간 에이전트야."
+        "아래 고객 발화에서 과도한 욕설·모욕·비속어는 스스로 판단해 "
+        "`[차단된 발언]`으로 대체하고, 상담사에게 전달할 수 있도록 해줘 "
+        "문어체로 작성하며"
+        "반드시 다음 형식으로 응답해 줘:\n\n"
+        "[상담사 전달용 필터&요약문]\n"
+        "- 문의 요지: <여기에 핵심 문의 내용>\n"
+        "- 감정 상태: <여기에 감정 상태>\n"
+        "\n\n"
+
+    )
+    user_block = f"```\n{raw_text}\n```"
+
+    resp = openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_block},
+        ],
+        temperature=0.2,
+    )
+    return resp.choices[0].message.content.strip()
+
+
+# if __name__ == "__main__":
+#     # STT에서 넘어온 예시 원문
+#     raw = (
+#         "아니 해킹당해서 사람 번거롭게 하는것도 짜증나는데 AI가 전화받게 시켜? "
+#         "됐고, 내 유심이나 빨리 교체해봐요! 씨발 "
+#         "똥은 니들이 싸고 왜 나더러 이래라 저래라야? 그냥 니들이 알아서 새 유심 우리집에 보내놓으면 되잖아?"
+#     )
+#     # raw = ("아 네 안녕하세요, 이번 유심 사태 때문에 문의하고 싶은게 있어서 전화했는데요,"
+#     # "그 유심보호서비스 있잖아요, 그거 가입하면 유심 교체 안해도 괜찮은건가요?"
+#     # )
+#     result = filtering(raw)
+#     print(result)
