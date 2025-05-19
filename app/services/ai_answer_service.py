@@ -21,7 +21,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MODEL_NAME = "all-MiniLM-L6-v2"
 COLLECTION_NAME = "faq_collection_pdf"
 PDF_PATH = os.path.join(os.path.dirname(__file__), "data/usim.pdf")
-SIMILARITY_THRESHOLD = 0.85
+SIMILARITY_THRESHOLD = 0.75
 
 # 모델 & 클라이언트 초기화
 sbert_model = SentenceTransformer(MODEL_NAME)
@@ -120,8 +120,8 @@ def search_faq_with_flag(user_query: str):
         print("[WARN] 유사한 FAQ 결과 없음")
         return False, "FAQ에 해당하는 질문이 없습니다."
 
-    filtered = [(m, d) for m, d in zip(metadatas, distances) if d <= SIMILARITY_THRESHOLD]
-    print(f"[INFO] 임계값 이하 필터링된 결과 수: {len(filtered)}")
+    filtered = [(m, d) for m, d in zip(metadatas, distances) if d >= SIMILARITY_THRESHOLD]
+    print(f"[INFO] 임계값 이상 필터링된 결과 수: {len(filtered)}")
     if not filtered:
         return False, "FAQ에 해당하는 질문이 없습니다."
 
@@ -145,4 +145,3 @@ def get_gpt_response(user_question: str):
     is_ans, answer = ask_faq_agent(user_question)
     print(answer)
     return is_ans, answer
-

@@ -32,7 +32,7 @@ def filtering(raw_text: str) -> str:
     )
     user_block = f"```\n{raw_text}\n```"
 
-    resp = openai.chat.completions.create(
+    resp = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": system_prompt},

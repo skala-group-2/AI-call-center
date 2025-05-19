@@ -68,9 +68,10 @@ def ai_call_center(user_question):
         }
         '''
         ai_mode = False
-        summary_text = summary(dialog)
         response = human_call_center(user_question)
-        response["summary"] = summary_text
+        if len(dialog) > 0:
+            summary_text = summary(dialog)
+            response["summary"] = summary_text
         return response
 
     # 대화록에 질문 - 응답 저장
