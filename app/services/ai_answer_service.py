@@ -132,7 +132,8 @@ def search_faq_with_flag(user_query: str):
 # 최종 질의 함수
 def ask_faq_agent(user_question: str):
     rewritten = rewrite_chain.run(user_question).strip()
-    return agent.run(f"다음 질문에 대해 FAQSearchTool을 사용해서 답변해줘: {rewritten}")
+    is_ans, answer = search_faq_with_flag(rewritten)
+    return is_ans, answer
 
 def get_gpt_response(user_question: str):
     """
@@ -141,7 +142,7 @@ def get_gpt_response(user_question: str):
     - question_text: 원 질문 (재작성 전)
     - answer_text: 벡터 검색 답변 또는 fallback 메시지
     """
-    answer = ask_faq_agent(user_question)
+    is_ans, answer = ask_faq_agent(user_question)
     print(answer)
-    return answer
+    return is_ans, answer
 
