@@ -128,6 +128,3 @@ def get_gpt_response(user_question: str):
     """
     return ask_faq_agent(user_question)
 
-# 초기 로딩 시 DB 준비만 수행
-if __name__ == "__main__":
-    prepare_vector_db()

@@ -105,3 +105,10 @@ async def reset_session():
     ai_mode = True
     logger.info("대화 내용과 AI 모드 초기화 완료")
     return {"message": "세션이 초기화되었습니다."}
+
+# def main():
+#     user_question = "Usim 변경하려면 어떻게 해야하나요?"
+#     print(ai_call_center(user_question))
+
+# if __name__ == "__main__":
+#     main()
