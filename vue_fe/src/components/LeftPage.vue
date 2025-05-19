@@ -42,6 +42,11 @@ import { ref } from "vue";
 const isRecording = ref(false);
 const chatLog = ref([]);
 
+// const props = useProps({ chatLog: Array });
+const emit = defineEmits(['summary']);
+
+// const userInput = ref('');
+
 let mediaRecorder;
 let audioChunks = [];
 
@@ -96,16 +101,16 @@ const handleCall = async () => {
             role: "ai",
             message: data.gpt_response || "(응답 없음)",
           });
-
+          
           if (data.tts_file_path) {
-            const audio = new Audio(data.tts_file_path);
-            audio.play();
+            const audioUrl = `http://localhost:8005${data.tts_file_path}`  
+            new Audio(audioUrl).play().catch(err => console.error("오디오 재생 실패:", err));
           }
         } else if (data.message?.includes("HUMAN MODE")) {
           // AI 불가 → 상담사 이관
           chatLog.value.push({
             role: "ai",
-            message: "(상담사 연결이 필요합니다)",
+            message: "상담사 연결이 필요합니다. 상담사와의 통화로 변환하겠습니다."
           });
 
           // 요약/필터링 결과 표시 (선택)
@@ -113,6 +118,11 @@ const handleCall = async () => {
             chatLog.value.push({
               role: "ai",
               message: `요약: ${data.summary}\n필터링 결과: ${data.filtered_question}`,
+            });
+
+            emit('summary', {
+              summary: data.summary,
+              filtered_question: data.filtered_question
             });
           }
         }

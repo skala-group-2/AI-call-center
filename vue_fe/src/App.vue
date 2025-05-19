@@ -1,27 +1,29 @@
 <template>
   <div class="container">
     <div class="half left">
-      <LeftPage @response-received="handleResponse" />
+      <LeftPage @summary="handleSummary" />
     </div>
     <div class="half right">
-      <RightPage :summary="summaryText" />
+      <RightPage :summary="summary" :filteredQuestion="filteredQuestion" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref } from 'vue';
 import LeftPage from "./components/LeftPage.vue";
 import RightPage from "./components/RightPage.vue";
 
-// 공유할 요약 텍스트 상태
-const summaryText = ref('')
+const summary = ref('');
+const filteredQuestion = ref('');
 
-// LeftPage로부터 응답 객체를 받으면, summaryText에 할당
-function handleResponse(payload) {
-  // payload는 LeftPage에서 emit한 데이터 객체
-  summaryText.value = payload.summary || ''
-}
+const handleSummary = (summaryData) => {
+  console.log('요약 데이터:', summaryData.summary);
+  console.log('필터링된 질문:', summaryData.filtered_question);
+
+  summary.value = summaryData.summary;
+  filteredQuestion.value = summaryData.filtered_question;
+};
 </script>
 
 <style>
