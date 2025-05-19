@@ -131,11 +131,8 @@ def search_faq_with_flag(user_query: str):
 
 # 최종 질의 함수
 def ask_faq_agent(user_question: str):
-    print(f"[INFO] 재작성 전 질문: {user_question}")
     rewritten = rewrite_chain.run(user_question).strip()
-    print(f"[INFO] 재작성된 질문: {rewritten}")
-    return search_faq_with_flag(rewritten)
-
+    return agent.run(f"다음 질문에 대해 FAQSearchTool을 사용해서 답변해줘: {rewritten}")
 
 def get_gpt_response(user_question: str):
     """
