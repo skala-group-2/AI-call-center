@@ -82,5 +82,5 @@ conversation = [
      "죄송합니다. 대리점 위치 안내는 상담사를 통해 도와드릴 수 있습니다. 지금 연결해드리겠습니다.")
 ]
 
-summary = summary(conversation)
-print(summary)
+summary_text = summary(conversation)
+print(summary_text)
