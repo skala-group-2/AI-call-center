@@ -63,14 +63,14 @@ const handleCall = async () => {
       formData.append("audio", blob, "audio.webm");
 
       try {
-        const res = await fetch("/stt-tts/", {
+        const res = await fetch("/call-center/", {
           method: "POST",
           body: formData,
         });
 
         if (!res.ok) {
           const errorText = await res.text();
-          console.error("STT-TTS API 실패:", res.status, errorText);
+          console.error("Call Center API 실패:", res.status, errorText);
           return;
         }
 
@@ -82,19 +82,34 @@ const handleCall = async () => {
           message: data.stt_text || "(음성 인식 실패)",
         });
 
-        // A: GPT의 응답
-        chatLog.value.push({
-          role: "ai",
-          message: data.gpt_response || "(응답 없음)",
-        });
+        if (data.gpt_response) {
+          // A: GPT 응답
+          chatLog.value.push({
+            role: "ai",
+            message: data.gpt_response || "(응답 없음)",
+          });
 
-        // 음성 응답 자동 재생
-        if (data.tts_file_path) {
-          const audio = new Audio(data.tts_file_path);
-          audio.play();
+          if (data.tts_file_path) {
+            const audio = new Audio(data.tts_file_path);
+            audio.play();
+          }
+        } else if (data.message?.includes("HUMAN MODE")) {
+          // AI 불가 → 상담사 이관
+          chatLog.value.push({
+            role: "ai",
+            message: "(상담사 연결이 필요합니다)",
+          });
+
+          // 요약/필터링 결과 표시 (선택)
+          if (data.summary) {
+            chatLog.value.push({
+              role: "ai",
+              message: `요약: ${data.summary}\n필터링 결과: ${data.filtered_question}`,
+            });
+          }
         }
       } catch (err) {
-        console.error("API 요청 중 오류:", err);
+        console.error("API 요청 오류:", err);
       }
 
       isRecording.value = false;
