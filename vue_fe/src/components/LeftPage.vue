@@ -60,7 +60,7 @@ const handleCall = async () => {
       const blob = new Blob(audioChunks, { type: "audio/webm" });
 
       const formData = new FormData();
-      formData.append("audio", blob, "audio.webm");
+      formData.append("audio", blob, "recording.webm"); //수정
 
       try {
         const res = await fetch("/call-center/", {
@@ -69,8 +69,16 @@ const handleCall = async () => {
         });
 
         if (!res.ok) {
-          const errorText = await res.text();
-          console.error("Call Center API 실패:", res.status, errorText);
+          // 서버가 500을 던지면 res.ok가 false가 됩니다
+          const contentType = res.headers.get('content-type');
+          let errDetail;
+          if (contentType && contentType.includes('application/json')) {
+            const errJson = await res.json();
+            errDetail = errJson.detail || JSON.stringify(errJson);
+          } else {
+            errDetail = await res.text();
+          }
+          console.error(`Call Center API 실패 [${res.status}]:`, errDetail);
           return;
         }
 

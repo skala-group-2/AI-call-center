@@ -45,7 +45,7 @@ rewrite_chain = LLMChain(llm=llm, prompt=rewrite_prompt)
 # LangChain Tool 정의
 vector_tool = Tool(
     name="FAQSearchTool",
-    func=lambda x: search_faq_with_flag(x)[2],
+    func=lambda x: search_faq_with_flag(x)[1],
     description="FAQ 스타일 질문을 받아 관련된 질문과 답변을 벡터 검색을 통해 반환하는 도구입니다."
 )
 
@@ -141,5 +141,7 @@ def get_gpt_response(user_question: str):
     - question_text: 원 질문 (재작성 전)
     - answer_text: 벡터 검색 답변 또는 fallback 메시지
     """
-    return ask_faq_agent(user_question)
+    answer = ask_faq_agent(user_question)
+    print(answer)
+    return answer
 

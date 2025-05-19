@@ -44,8 +44,10 @@ async def call_center(audio: UploadFile = File(...)):
             return human_call_center(stt_text)
         
     except Exception as e:
-        logger.error(f"에러 발생: {e}")
+        import traceback; traceback.print_exc()   # 전체 에러 스택을 터미널에 찍음
         raise HTTPException(status_code=500, detail=str(e))
+        # logger.error(f"에러 발생: {e}")
+        # raise HTTPException(status_code=500, detail=str(e))
     
 def ai_call_center(user_question):
     global ai_mode
