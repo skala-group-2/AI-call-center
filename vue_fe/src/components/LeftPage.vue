@@ -110,15 +110,22 @@ const handleCall = async () => {
           // AI 불가 → 상담사 이관
           chatLog.value.push({
             role: "ai",
-            message: "상담사 연결이 필요합니다. 상담사와의 통화로 변환하겠습니다."
+            message: "상담사 연결이 필요합니다. 상담사와의 통화로 변환하겠습니다.",
+            _playHumanAudio: (() => {
+              const humanAudioUrl = `http://127.0.0.1:8005/uploads/to_human_tts.mp3`;
+              new Audio(humanAudioUrl)
+              .play()
+              .catch(err => console.error("오디오 재생 실패:", err));
+            })()
+            
           });
 
           // 요약/필터링 결과 표시 (선택)
           if (data.summary) {
-            chatLog.value.push({
-              role: "ai",
-              message: `요약: ${data.summary}\n필터링 결과: ${data.filtered_question}`,
-            });
+            // chatLog.value.push({
+            //   role: "ai",
+            //   message: `요약: ${data.summary}\n필터링 결과: ${data.filtered_question}`,
+            // });
 
             emit('summary', {
               summary: data.summary,
