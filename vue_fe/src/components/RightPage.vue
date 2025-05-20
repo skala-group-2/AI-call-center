@@ -42,13 +42,15 @@ const props = defineProps({
 .right-page {
   width: 100%;
   height: 100%;
+  flex: 1;    
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 16px;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-y: auto;
+  min-height: 0;      /* ← flex 자식에 꼭 필요 */
 }
 
 .centered-content {

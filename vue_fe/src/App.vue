@@ -35,7 +35,7 @@ body,
   padding: 0;
   height: 100%;
   width: 100%;
-  overflow: hidden;
+  /* overflow: hidden; */
 }
 </style>
 
@@ -44,7 +44,7 @@ body,
   display: flex;
   width: 100vw;
   height: 100vh;
-  overflow: hidden;
+  /* overflow: hidden; */
 }
 
 .half {
@@ -52,8 +52,9 @@ body,
   height: 100%;
   box-sizing: border-box;
   min-width: 0;
+  min-height: 0;     /* ← 꼭 추가: y축 오버플로우 허용 */
   max-width: 50%; /* 최대 너비를 50%로 제한 */
-  overflow: hidden; /* 내용이 넘치지 않도록 함 */
+  overflow-y: auto; /* 내용이 넘치지 않도록 함 */
 }
 
 .left {
