@@ -14,8 +14,8 @@
       <div v-else class="summary-container">
         <h3>상담 요약</h3>
         <div class="summary-content">
-          <p><strong>요약:</strong> {{ summary }}</p>
-          <p><strong>필터링된 질문:</strong> {{ filteredQuestion }}</p>
+          <p><strong>요약:</strong><br/><span v-html="summary"></span></p>
+          <p><strong>필터링된 질문:</strong><br/><span v-html="filteredQuestion"></span></p>
         </div>
       </div>
     </div>
@@ -108,6 +108,7 @@ li {
   padding: 16px;
   border-radius: 8px;
   margin-top: 16px;
+  text-align: left;
 }
 
 .summary-content p {

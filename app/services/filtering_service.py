@@ -23,11 +23,10 @@ def filtering(raw_text: str) -> str:
         "제공되는 고객 발화에서 과도한 욕설·모욕·비속어는 스스로 판단해서 "
         "`[차단된 발언]`으로 대체하고, **상담사**에게 전달하는 역할이야 "
         "문어체로 작성하며 욕설을 제외하고 원문의 내용을 최대한 포함해줘"
-        "반드시 다음 형식으로 응답해 줘:\n\n"
-        "[상담사 전달용 필터&요약문]\n"
-        "- 문의 요지: <여기에 핵심 문의 내용>\n"
-        "- 감정 상태: <여기에 감정 상태>\n"
-        "\n\n"
+        "반드시 다음 형식으로 응답해 줘:"
+        "[상담사 전달용 필터링 및 마지막 대화 요약문]"
+        "1. 마지막 질문의 요지: <여기에 핵심 문의 내용>"
+        "2. 감정 상태: <여기에 감정 상태>"
 
     )
     user_block = f"```\n{raw_text}\n```"
@@ -40,7 +39,8 @@ def filtering(raw_text: str) -> str:
         ],
         temperature=0.2,
     )
-    return resp.choices[0].message.content.strip()
+    return resp.choices[0].message["content"].strip().replace("\n", "<br>")
+
 
 
 # if __name__ == "__main__":

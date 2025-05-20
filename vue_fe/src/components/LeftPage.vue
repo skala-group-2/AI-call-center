@@ -102,8 +102,9 @@ const handleCall = async () => {
             message: data.gpt_response || "(응답 없음)",
           });
           
+        
           if (data.tts_file_path) {
-            const audioUrl = `http://localhost:8005${data.tts_file_path}`  
+            const audioUrl = `http://localhost:8005${data.tts_file_path}?_=${Date.now()}`;  
             new Audio(audioUrl).play().catch(err => console.error("오디오 재생 실패:", err));
           }
         } else if (data.message?.includes("HUMAN MODE")) {

@@ -1,7 +1,7 @@
 from pydub import AudioSegment
 import whisper
 
-model = whisper.load_model("base")
+model = whisper.load_model("small")
 
 def convert_webm_to_wav(webm_path, wav_path):
     audio = AudioSegment.from_file(webm_path, format="webm")
