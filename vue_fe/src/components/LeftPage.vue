@@ -6,14 +6,17 @@
     </div>
 
     <div class="chat-area">
-      <!-- 메시지 구조 변경 - AI 메시지일 때 순서 조정 -->
-      <div v-for="(msg, i) in chatLog" :key="i" :class="['message', msg.role]">
-        <!-- 사용자 메시지는 Q-버블 순서, AI 메시지는 버블-A 순서 -->
+      <!-- 부모로부터 받은 props.chatLog 사용 -->
+      <div
+        v-for="(msg, i) in props.chatLog"
+        :key="i"
+        :class="['message', msg.role]"
+      >
         <template v-if="msg.role === 'user'">
           <div class="label">Q</div>
           <div class="bubble">{{ msg.message }}</div>
         </template>
-        <template v-else>
+        <template v-else-if="msg.role === 'ai'">
           <div class="bubble">{{ msg.message }}</div>
           <div class="label">A</div>
         </template>
@@ -37,18 +40,28 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, watch } from "vue";
+
+// 1) 부모로부터 chatLog 받아오기
+const props = defineProps({
+  chatLog: {
+    type: Array,
+    required: true
+  }
+});
+
+// 2) 메시지 전송, 요약 이벤트 정의
+const emit = defineEmits(["send-message", "summary", "human-mode-triggered"]);
 
 const isRecording = ref(false);
-const chatLog = ref([]);
-
-// const props = useProps({ chatLog: Array });
-const emit = defineEmits(['summary']);
-
-// const userInput = ref('');
-
+const hasHumanModeTriggered = ref(false);  // HUMAN MODE 트리거 여부 추적
 let mediaRecorder;
 let audioChunks = [];
+
+// hasHumanModeTriggered 변경 감지하여 부모에게 전달
+watch(hasHumanModeTriggered, (newValue) => {
+  emit("human-mode-triggered", newValue);
+});
 
 const handleCall = async () => {
   if (!isRecording.value) {
@@ -63,9 +76,8 @@ const handleCall = async () => {
 
     mediaRecorder.onstop = async () => {
       const blob = new Blob(audioChunks, { type: "audio/webm" });
-
       const formData = new FormData();
-      formData.append("audio", blob, "recording.webm"); //수정
+      formData.append("audio", blob, "recording.webm");
 
       try {
         const res = await fetch("/call-center/", {
@@ -74,64 +86,67 @@ const handleCall = async () => {
         });
 
         if (!res.ok) {
-          // 서버가 500을 던지면 res.ok가 false가 됩니다
-          const contentType = res.headers.get('content-type');
-          let errDetail;
-          if (contentType && contentType.includes('application/json')) {
-            const errJson = await res.json();
-            errDetail = errJson.detail || JSON.stringify(errJson);
-          } else {
-            errDetail = await res.text();
-          }
-          console.error(`Call Center API 실패 [${res.status}]:`, errDetail);
+          // 에러 상세 로깅
+          const ct = res.headers.get("content-type") || "";
+          const detail = ct.includes("application/json")
+            ? (await res.json()).detail || JSON.stringify(await res.json())
+            : await res.text();
+          console.error(`Call Center API 실패 [${res.status}]:`, detail);
           return;
         }
 
         const data = await res.json();
+        console.log(data)
 
-        // Q: 사용자의 인식된 질문
-        chatLog.value.push({
+        // 3) 사용자 메시지 emit
+        emit("send-message", {
           role: "user",
           message: data.stt_text || "(음성 인식 실패)",
         });
 
         if (data.gpt_response) {
-          // A: GPT 응답
-          chatLog.value.push({
+          // 4) AI 메시지 emit
+          emit("send-message", {
             role: "ai",
             message: data.gpt_response || "(응답 없음)",
           });
-          
+
+          // TTS 재생
           if (data.tts_file_path) {
-            const audioUrl = `http://localhost:8005${data.tts_file_path}`  
-            new Audio(audioUrl).play().catch(err => console.error("오디오 재생 실패:", err));
+            const audioUrl = `http://localhost:8005${data.tts_file_path}?_=${Date.now()}`;
+            new Audio(audioUrl).play().catch((err) =>
+              console.error("오디오 재생 실패:", err)
+            );
           }
-        } else if (data.message?.includes("HUMAN MODE")) {
-          // AI 불가 → 상담사 이관
-          chatLog.value.push({
+        } else if (data.message?.includes("HUMAN MODE") && !hasHumanModeTriggered.value) {
+          // HUMAN MODE 트리거 표시
+          hasHumanModeTriggered.value = true;
+          
+          // 상담사 모드
+          emit("send-message", {
             role: "ai",
             message: "상담사 연결이 필요합니다. 상담사와의 통화로 변환하겠습니다.",
-            _playHumanAudio: (() => {
-              const humanAudioUrl = `http://127.0.0.1:8005/uploads/to_human_tts.mp3`;
-              new Audio(humanAudioUrl)
-              .play()
-              .catch(err => console.error("오디오 재생 실패:", err));
-            })()
-            
           });
 
-          // 요약/필터링 결과 표시 (선택)
-          if (data.summary) {
-            // chatLog.value.push({
-            //   role: "ai",
-            //   message: `요약: ${data.summary}\n필터링 결과: ${data.filtered_question}`,
-            // });
+          // 상담사 안내 TTS
+          const humanAudioUrl = `http://127.0.0.1:8005/uploads/to_human_tts.mp3`;
+          new Audio(humanAudioUrl).play().catch((err) =>
+            console.error("오디오 재생 실패:", err)
+          );
 
-            emit('summary', {
+          // 5) 요약/필터링 결과 emit
+          if (data.summary) {
+            emit("summary", {
               summary: data.summary,
-              filtered_question: data.filtered_question
+              filtered_question: data.filtered_question,
             });
           }
+        }
+        if (data.filtered_question) {
+          emit("send-message", {
+            role: "filter",
+            message: data.filtered_question || "(응답 없음)",
+          });
         }
       } catch (err) {
         console.error("API 요청 오류:", err);
@@ -182,6 +197,7 @@ const handleCall = async () => {
   margin-top: 60px; /* 로고 아래에 공간 확보 */
   width: 100%; /* 추가: 너비 명시 */
   box-sizing: border-box; /* 추가: 패딩 포함 */
+  text-align: left;
 }
 
 /* 메시지 컨테이너 */

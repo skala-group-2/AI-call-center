@@ -10,8 +10,7 @@ from chromadb.utils import embedding_functions
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from langchain.agents import initialize_agent, Tool
-from langchain.agents.agent_types import AgentType
+from openai.error import RateLimitError, AuthenticationError
 
 # 환경변수 로드
 load_dotenv()
@@ -21,43 +20,48 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MODEL_NAME = "all-MiniLM-L6-v2"
 COLLECTION_NAME = "faq_collection_pdf"
 PDF_PATH = os.path.join(os.path.dirname(__file__), "data/usim.pdf")
-SIMILARITY_THRESHOLD = 0.75
 
-# 모델 & 클라이언트 초기화
+# 초기화
 sbert_model = SentenceTransformer(MODEL_NAME)
 chroma_client = chromadb.Client(Settings(anonymized_telemetry=False))
+llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
 
-# 질문 재작성 프롬프트 + 체인
-rewrite_prompt = PromptTemplate.from_template(
-    """
-너는 고객센터 FAQ 질의 재작성 어시스턴트야.
-다음 질문을 공식적인 FAQ 질문처럼 고쳐줘. 문맥은 유지하면서 구체화해줘.
+# 질문 재작성 프롬프트
+rewrite_prompt = PromptTemplate.from_template("""
+너는 SKT 고객센터의 FAQ 질문 생성 어시스턴트야.
+
+고객이 입력한 문장은 통화 또는 자연어 문장 형식이야.
+내용이 USIM 또는 eSIM과 관련된 경우, 그 질문을 공식 FAQ 스타일로 간단하고 명확하게 정리해줘.
+- 설명이나 배경은 제거하고
+- 질문만 남기고
+- 간단한 문장으로 변환해
+
+만약 질문이 USIM과 관련이 없다면, 아래처럼 말해:
+관련 없는 질문입니다.
+
+절대로 답변을 하지 말고, 반드시 질문 형태로 끝내줘.
 
 [사용자 질문]
 {user_question}
 
-[FAQ 스타일 질문]
-"""
-)
-llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+[FAQ 질문]
+""")
 rewrite_chain = LLMChain(llm=llm, prompt=rewrite_prompt)
 
-# LangChain Tool 정의
-vector_tool = Tool(
-    name="FAQSearchTool",
-    func=lambda x: search_faq_with_flag(x)[1],
-    description="FAQ 스타일 질문을 받아 관련된 질문과 답변을 벡터 검색을 통해 반환하는 도구입니다."
-)
+# 상담사 말투로 포장하는 프롬프트
+wrap_prompt = PromptTemplate.from_template("""
+너는 SKT 고객센터의 상담사야.
+고객에게 아래의 내용을 정중하고 친절한 말투로 전달해줘.
+내용은 바꾸지 말고, 말투만 부드럽고 친절하게 포장해줘.
 
-# LangChain Agent 정의
-agent = initialize_agent(
-    tools=[vector_tool],
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=False
-)
+[답변 원문]
+{raw_answer}
 
-# PDF에서 FAQ 추출
+[상담사 응답]
+""")
+wrap_chain = LLMChain(llm=llm, prompt=wrap_prompt)
+
+# PDF FAQ 추출
 def extract_faq_from_pdf(pdf_path: str):
     print(f"[INFO] PDF 로딩: {pdf_path}")
     doc = fitz.open(pdf_path)
@@ -67,81 +71,109 @@ def extract_faq_from_pdf(pdf_path: str):
     print(f"[INFO] 추출된 FAQ 수: {len(matches)}")
     return [{"question": q.strip(), "answer": a.strip()} for q, a in matches]
 
-# 벡터 DB 준비
+# 벡터DB 구성
 def prepare_vector_db():
-    # print("[INFO] 벡터 DB 재구성 시작")
-    # try:
-    #     chroma_client.delete_collection(name=COLLECTION_NAME)
-    #     print(f"[INFO] 기존 컬렉션 '{COLLECTION_NAME}' 삭제 완료")
-    # except:
-    #     print(f"[WARN] 컬렉션 '{COLLECTION_NAME}' 삭제 실패 또는 없음")
-
-    collection = chroma_client.create_collection(
+    collection = chroma_client.get_or_create_collection(
         name=COLLECTION_NAME,
         embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name=MODEL_NAME)
     )
-    print("[INFO] 새 컬렉션 생성 완료")
+    print("[INFO] 벡터 컬렉션 확보 완료")
 
-    faq_data = extract_faq_from_pdf(PDF_PATH)
-    if faq_data:
+    if collection.count() == 0:
+        faq_data = extract_faq_from_pdf(PDF_PATH)
         ids = [f"faq_{i}" for i in range(len(faq_data))]
         docs = [f"{item['question']} {item['answer']}" for item in faq_data]
         collection.add(ids=ids, documents=docs, metadatas=faq_data)
         print(f"[INFO] 총 {len(docs)}개 FAQ 문서 인덱싱 완료")
     else:
-        print("[WARN] PDF에서 추출된 FAQ 없음")
+        print(f"[INFO] 기존 FAQ 문서 수: {collection.count()}")
 
     return collection
 
-# 벡터 검색 + 결과 상태 리턴
-def search_faq_with_flag(user_query: str):
-    print(f"[INFO] 사용자의 원 질문: {user_query}")
-    try:
-        collection = chroma_client.get_collection(
-            name=COLLECTION_NAME,
-            embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction(model_name=MODEL_NAME)
-        )
-        print("[INFO] 기존 벡터 컬렉션 로드 성공")
-    except:
-        print("[WARN] 컬렉션 로드 실패, 새로 생성합니다.")
-        collection = prepare_vector_db()
-
+# 유사 FAQ LLM 선택
+def search_faq_answer(user_query: str):
+    collection = prepare_vector_db()
     results = collection.query(
         query_texts=[user_query],
-        n_results=5,
-        include=["distances", "metadatas"]
+        n_results=20,
+        include=["metadatas"]
     )
-    print(f"[INFO] 유사도 검색 완료. 결과 수: {len(results['distances'][0])}")
 
-    distances = results.get("distances", [[]])[0]
-    metadatas = results.get("metadatas", [[]])[0]
+    metadatas = results["metadatas"][0]
+    if not metadatas:
+        print("[WARN] FAQ 검색 결과 없음")
+        return False, "관련된 FAQ가 없습니다. 상담사에게 연결해 드릴게요."
 
-    if not distances or not metadatas:
-        print("[WARN] 유사한 FAQ 결과 없음")
-        return False, "FAQ에 해당하는 질문이 없습니다."
+    faq_list_str = "\n".join([
+        f"- 질문: {m['question']}\n  답변: {m['answer']}" for m in metadatas
+    ])
 
-    filtered = [(m, d) for m, d in zip(metadatas, distances) if d >= SIMILARITY_THRESHOLD]
-    print(f"[INFO] 임계값 이상 필터링된 결과 수: {len(filtered)}")
-    if not filtered:
-        return False, "FAQ에 해당하는 질문이 없습니다."
+    selection_prompt = PromptTemplate.from_template("""
+너는 SKT 고객센터 FAQ 추천 어시스턴트야.
+아래는 사용자의 질문과 관련된 FAQ 질문/답변 목록이야.
+사용자 질문에 가장 적절한 FAQ의 '답변'만 출력해줘. 설명은 하지 마.
+정확히 매칭되는 것이 없으면 "관련된 FAQ를 찾지 못했습니다."라고 말해줘.
 
-    best_match = filtered[0]
-    print(f"[INFO] 최종 선택된 FAQ 답변: {best_match[0]['answer'][:100]}...")
-    return True, best_match[0]["answer"]
+[사용자 질문]
+{user_question}
 
-# 최종 질의 함수
+[후보 FAQ 목록]
+{faq_list}
+
+[선택된 답변]
+""")
+    selection_chain = LLMChain(llm=llm, prompt=selection_prompt)
+
+    try:
+        best_answer = selection_chain.invoke({
+            "user_question": user_query,
+            "faq_list": faq_list_str
+        })["text"].strip()
+
+        # 📌 다양한 실패 표현 탐지
+        FAILURE_INDICATORS = [
+            "관련된 FAQ를 찾지 못했습니다",
+            "FAQ를 찾지 못했어요",
+            "찾지 못했습니다",
+            "답변을 제공해 드릴 수 없습니다",
+            "상담사에게 연결",
+            "정보가 없습니다",
+            "죄송합니다"
+        ]
+
+        if any(keyword in best_answer for keyword in FAILURE_INDICATORS) or len(best_answer) < 10:
+            print("[INFO] LLM이 관련 FAQ를 찾지 못했다고 판단")
+            return False, "죄송합니다. 해당 질문에 대한 정보를 찾지 못했어요. 상담사에게 연결해 드릴게요."
+
+        wrapped = wrap_chain.invoke({"raw_answer": best_answer})["text"].strip()
+        return True, wrapped
+
+    except Exception as e:
+        print(f"[ERROR] LLM 판단 오류: {str(e)}")
+        return False, "FAQ 판단 중 오류가 발생했습니다."
+
+
+# 메인 질의 처리
 def ask_faq_agent(user_question: str):
-    rewritten = rewrite_chain.run(user_question).strip()
-    is_ans, answer = search_faq_with_flag(rewritten)
-    return is_ans, answer
+    try:
+        rewritten = rewrite_chain.invoke({"user_question": user_question})["text"].strip()
+        print(f"[INFO] 재작성된 질문: {rewritten}")
+    except RateLimitError:
+        return False, "현재 AI 처리 요청이 많아 지연되고 있습니다. 잠시 후 다시 시도해 주세요."
+    except AuthenticationError:
+        return False, "API 인증 오류입니다. OpenAI 키를 다시 확인해 주세요."
+    except Exception as e:
+        return False, f"질문 재작성 중 오류 발생: {str(e)}"
 
+    if "관련 없는 질문입니다" in rewritten:
+        print("[INFO] USIM 관련 없는 질문으로 판단됨")
+        return True, "관련 없는 질문입니다."
+
+    return search_faq_answer(rewritten)
+
+# 최상위 진입점
 def get_gpt_response(user_question: str):
-    """
-    외부 서비스용 진입점 함수: 질문 입력 시
-    - test: 벡터 검색 가능 여부
-    - question_text: 원 질문 (재작성 전)
-    - answer_text: 벡터 검색 답변 또는 fallback 메시지
-    """
-    is_ans, answer = ask_faq_agent(user_question)
+    is_valid, answer = ask_faq_agent(user_question)
     print(answer)
-    return is_ans, answer
+    print(is_valid)
+    return is_valid, answer

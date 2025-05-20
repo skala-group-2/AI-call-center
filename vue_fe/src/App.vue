@@ -1,29 +1,46 @@
 <template>
   <div class="container">
     <div class="half left">
-      <LeftPage @summary="handleSummary" />
+      <LeftPage
+        :chat-log="chatLog"
+        @send-message="handleSendMessage"
+        @summary="handleSummary"
+        @human-mode-triggered="handleHumanModeTriggered"
+      />
     </div>
     <div class="half right">
-      <RightPage :summary="summary" :filteredQuestion="filteredQuestion" />
+      <RightPage
+        :chat-log="chatLog"
+        :summary="summary"
+        :filtered-question="filteredQuestion"
+        :is-human-mode="isHumanMode"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import LeftPage from "./components/LeftPage.vue";
-import RightPage from "./components/RightPage.vue";
+import { ref } from 'vue'
+import LeftPage from './components/LeftPage.vue'
+import RightPage from './components/RightPage.vue'
 
-const summary = ref('');
-const filteredQuestion = ref('');
+const chatLog = ref([])
+const summary = ref('')
+const filteredQuestion = ref('')
+const isHumanMode = ref(false)
 
-const handleSummary = (summaryData) => {
-  console.log('요약 데이터:', summaryData.summary);
-  console.log('필터링된 질문:', summaryData.filtered_question);
+const handleSendMessage = (newMsg) => {
+  chatLog.value.push(newMsg)
+}
 
-  summary.value = summaryData.summary;
-  filteredQuestion.value = summaryData.filtered_question;
-};
+const handleSummary = (data) => {
+  summary.value = data.summary
+  filteredQuestion.value = data.filtered_question
+}
+
+const handleHumanModeTriggered = (value) => {
+  isHumanMode.value = value
+}
 </script>
 
 <style>
